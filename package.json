@@ -1,0 +1,23 @@
+{
+  "name": "video-dashboard",
+  "version": "1.0.0",
+  "description": "Electron video dashboard with 12 video feeds in 3x4 grid",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux"
+  },
+  "keywords": ["electron", "video", "dashboard", "streaming"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "hls.js": "^1.5.0"
+  },
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.9.0"
+  }
+}

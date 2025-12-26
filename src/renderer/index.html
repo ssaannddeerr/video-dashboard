@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:; frame-src https://www.youtube.com;">
+  <title>Video Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <div class="video-grid">
+    <!-- Video 1: Prague HLS Stream -->
+    <div class="video-container" data-feed="prague">
+      <video id="video-1" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 2: YouTube Live Stream -->
+    <div class="video-container" data-feed="youtube-live">
+      <video id="video-2" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Videos 3-12: Placeholders -->
+    <!-- Video 3: EarthTV Stream -->
+    <div class="video-container" data-feed="earthtv">
+      <video id="video-3" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 4: YouTube Stream 2 -->
+    <div class="video-container" data-feed="youtube-2">
+      <video id="video-4" autoplay muted playsinline loop></video>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-5">
+      <div class="placeholder-content">
+        <span>Feed 5</span>
+      </div>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-6">
+      <div class="placeholder-content">
+        <span>Feed 6</span>
+      </div>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-7">
+      <div class="placeholder-content">
+        <span>Feed 7</span>
+      </div>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-8">
+      <div class="placeholder-content">
+        <span>Feed 8</span>
+      </div>
+    </div>
+
+    <!-- Video 9: YouTube Stream 6 -->
+    <div class="video-container" data-feed="youtube-6">
+      <video id="video-9" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 10: YouTube Stream 5 -->
+    <div class="video-container" data-feed="youtube-5">
+      <video id="video-10" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 11: YouTube Stream 4 -->
+    <div class="video-container" data-feed="youtube-4">
+      <video id="video-11" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 12: YouTube Stream 3 -->
+    <div class="video-container" data-feed="youtube-3">
+      <video id="video-12" autoplay muted playsinline loop></video>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
