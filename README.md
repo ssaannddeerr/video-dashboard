@@ -25,13 +25,7 @@ This project is currently under active development. Features and functionality m
 
 ### Main Dashboard
 ![Dashboard Screenshot](screenshots/dashboard.png)
-*The main 3x4 video grid showing multiple live streams*
-
-### Hover Effect
-![Hover Effect](screenshots/hover-effect.png)
-*Video containers with interactive hover effects*
-
-> **Note:** Screenshots will be added once captured from the running application.
+*The main 3x4 video grid showing multiple live streams with animated gradient background*
 
 ## 🛠️ Technology Stack
 
@@ -50,7 +44,7 @@ This project is currently under active development. Features and functionality m
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/video-dashboard.git
+   git clone https://github.com/ssaannddeerr/video-dashboard.git
    cd video-dashboard
    ```
 
