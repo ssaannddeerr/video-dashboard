@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:;">
+  <title>Video Dashboard</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+</head>
+<body>
+  <!-- Token Input Modal -->
+  <div id="token-modal" class="token-modal" style="display: none;">
+    <div class="token-modal-content">
+      <h2>Update Authentication Token</h2>
+      <p>Enter the new token (just the token, not the full URL)</p>
+      <p style="font-size: 14px; color: #888;">Example: untdjak3baquslofkf5tvp1v07</p>
+      <p id="token-source-link" style="margin: 10px 0; font-size: 13px;">
+        <strong>Get token from:</strong><br>
+        <a id="token-source-url" href="#" target="_blank" rel="noopener noreferrer"></a>
+      </p>
+      <input type="text" id="token-input" placeholder="Enter token here..." />
+      <div class="token-modal-buttons">
+        <button id="token-submit">Update</button>
+        <button id="token-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="video-grid">
+    <!-- Video 1: Prague HLS Stream -->
+    <div class="video-container" data-feed="prague">
+      <video id="video-1" autoplay muted playsinline loop></video>
+      <button class="token-update-btn" data-video="video-1" title="Update Token">🔑</button>
+    </div>
+
+    <!-- Video 3: EarthTV Stream (moved to position 2) -->
+    <div class="video-container" data-feed="earthtv">
+      <video id="video-3" autoplay muted playsinline loop></video>
+      <button class="token-update-btn" data-video="video-3" title="Update Token">🔑</button>
+    </div>
+
+    <!-- Video 6: Skyline Prague Stream (moved to position 3) -->
+    <div class="video-container" data-feed="skyline-2">
+      <video id="video-6" autoplay muted playsinline loop></video>
+      <button class="token-update-btn" data-video="video-6" title="Update Token">🔑</button>
+    </div>
+
+    <!-- Video 4: YouTube Stream 2 (moved to position 4) -->
+    <div class="video-container" data-feed="youtube-2">
+      <video id="video-4" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Position 5: Placeholder -->
+    <div class="video-container placeholder" data-feed="placeholder-5">
+      <div class="placeholder-content">
+        <span>Feed 5</span>
+      </div>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-6">
+      <div class="placeholder-content">
+        <span>Feed 6</span>
+      </div>
+    </div>
+
+    <div class="video-container placeholder" data-feed="placeholder-7">
+      <div class="placeholder-content">
+        <span>Feed 7</span>
+      </div>
+    </div>
+
+    <!-- Video 2: YouTube Live Stream (moved to position 8) -->
+    <div class="video-container" data-feed="youtube-live">
+      <video id="video-2" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 9: YouTube Stream 6 -->
+    <div class="video-container" data-feed="youtube-6">
+      <video id="video-9" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 10: YouTube Stream 5 -->
+    <div class="video-container" data-feed="youtube-5">
+      <video id="video-10" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 11: YouTube Stream 4 -->
+    <div class="video-container" data-feed="youtube-4">
+      <video id="video-11" autoplay muted playsinline loop></video>
+    </div>
+
+    <!-- Video 12: YouTube Stream 3 -->
+    <div class="video-container" data-feed="youtube-3">
+      <video id="video-12" autoplay muted playsinline loop></video>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
