@@ -24,7 +24,7 @@ This project is currently under active development. Features and functionality m
 ## 🖼️ Screenshots
 
 ### Main Dashboard
-![Dashboard Screenshot](screenshots/Screenshot_27-Dec_13-12-05_328.png)
+![Dashboard Screenshot](screenshots/Screenshot_28-Dec_06-34-59_15985.png)
 *The main 3x4 video grid showing multiple live streams with animated gradient background*
 
 ## 🛠️ Technology Stack
