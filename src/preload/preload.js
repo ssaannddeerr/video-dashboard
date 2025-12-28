@@ -17,5 +17,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Remove listener when no longer needed
   removeUrlsRefreshedListener: () => {
     ipcRenderer.removeAllListeners('urls-refreshed');
-  }
+  },
+
+  // MPV controls
+  startMPV: (videoId, streamUrl, geometry) => ipcRenderer.invoke('start-mpv', videoId, streamUrl, geometry),
+  stopMPV: (videoId) => ipcRenderer.invoke('stop-mpv', videoId)
 });

@@ -1,5 +1,46 @@
-// Store HLS instances globally for URL updates
+// Store HLS and DASH instances globally for URL updates
 const hlsInstances = {};
+const dashInstances = {};
+
+// Store both low and high quality URLs for YouTube videos
+const videoQualityUrls = {};
+
+// DASH Video Initialization Function
+function initializeDASHVideo(videoElement, streamUrl) {
+  if (typeof dashjs !== 'undefined') {
+    const player = dashjs.MediaPlayer().create();
+
+    // Configure player settings
+    player.updateSettings({
+      streaming: {
+        lowLatencyEnabled: true,
+        delay: {
+          liveDelay: 3
+        }
+      }
+    });
+
+    // Set up event listeners before initialization
+    player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
+      console.log('DASH stream initialized');
+      videoElement.play().catch(err => {
+        console.error('Autoplay prevented:', err);
+      });
+    });
+
+    player.on(dashjs.MediaPlayer.events.ERROR, (e) => {
+      console.error('DASH error:', e);
+    });
+
+    // Initialize with autoplay
+    player.initialize(videoElement, streamUrl, true);
+
+    return player;
+  } else {
+    console.error('DASH is not supported - dashjs library not loaded');
+    return null;
+  }
+}
 
 // HLS Video Initialization Function
 function initializeHLSVideo(videoElement, streamUrl) {
@@ -16,6 +57,17 @@ function initializeHLSVideo(videoElement, streamUrl) {
     hls.attachMedia(videoElement);
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      // Debug: Log available quality levels
+      console.log(`HLS levels available: ${hls.levels.length}`, hls.levels.map(l => ({
+        height: l.height,
+        width: l.width,
+        bitrate: l.bitrate,
+        name: l.name
+      })));
+
+      // Set to low quality (360p-ish) for grid view
+      setLowQuality(hls);
+
       videoElement.play().catch(err => {
         console.error('Autoplay prevented:', err);
         // Add visual indicator that user interaction is needed
@@ -57,6 +109,37 @@ function initializeHLSVideo(videoElement, streamUrl) {
   }
 }
 
+// Set HLS to low quality (~360p)
+function setLowQuality(hls) {
+  if (!hls || !hls.levels || hls.levels.length === 0) {
+    console.log('Cannot set quality - no levels available');
+    return;
+  }
+
+  // Use lowest quality level (index 0 is usually lowest)
+  hls.currentLevel = 0;
+
+  const level = hls.levels[0];
+  const info = level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1000)}kbps`;
+  console.log(`Set quality to LOW: level 0 (${info})`);
+}
+
+// Set HLS to max quality
+function setMaxQuality(hls) {
+  if (!hls || !hls.levels || hls.levels.length === 0) {
+    console.log('Cannot set quality - no levels available');
+    return;
+  }
+
+  // Set to highest quality (last level is usually highest)
+  const maxLevel = hls.levels.length - 1;
+  hls.currentLevel = maxLevel;
+
+  const level = hls.levels[maxLevel];
+  const info = level.height ? `${level.height}p` : `${Math.round(level.bitrate / 1000)}kbps`;
+  console.log(`Set quality to MAX: level ${maxLevel} (${info})`);
+}
+
 // Update video source with new URL (for periodic refresh)
 function updateVideoSource(videoId, newUrl) {
   const videoElement = document.getElementById(videoId);
@@ -71,26 +154,62 @@ function updateVideoSource(videoId, newUrl) {
     return;
   }
 
-  const hlsInstance = hlsInstances[videoId];
+  // Detect stream type
+  const isDash = newUrl.includes('.mpd');
+  const isMp4 = newUrl.includes('.mp4') || newUrl.includes('127.0.0.1');
 
-  // If no HLS instance exists yet, create one (initial load case)
-  if (!hlsInstance) {
-    console.log(`Creating initial HLS instance for ${videoId}`);
-    hlsInstances[videoId] = initializeHLSVideo(videoElement, newUrl);
-    return;
+  if (isMp4) {
+    // Handle native MP4 playback (for Feratel proxy)
+    console.log(`${videoId}: Using native MP4 playback`);
+
+    // Clean up any existing HLS/DASH instances
+    if (hlsInstances[videoId]) {
+      hlsInstances[videoId].destroy();
+      delete hlsInstances[videoId];
+    }
+    if (dashInstances[videoId]) {
+      dashInstances[videoId].destroy();
+      delete dashInstances[videoId];
+    }
+
+    // Use native video element
+    videoElement.src = newUrl;
+    videoElement.load();
+    videoElement.play().catch(err => {
+      console.error(`${videoId}: Autoplay prevented:`, err);
+    });
+  } else if (isDash) {
+    // Handle DASH stream
+    const dashInstance = dashInstances[videoId];
+
+    if (!dashInstance) {
+      console.log(`Creating initial DASH instance for ${videoId}`);
+      dashInstances[videoId] = initializeDASHVideo(videoElement, newUrl);
+      return;
+    }
+
+    console.log(`Updating ${videoId} DASH stream with new URL`);
+    dashInstance.attachSource(newUrl);
+  } else {
+    // Handle HLS stream
+    const hlsInstance = hlsInstances[videoId];
+
+    if (!hlsInstance) {
+      console.log(`Creating initial HLS instance for ${videoId}`);
+      hlsInstances[videoId] = initializeHLSVideo(videoElement, newUrl);
+      return;
+    }
+
+    // Check if URL actually changed
+    const currentUrl = hlsInstance.url;
+    if (currentUrl === newUrl) {
+      console.log(`${videoId}: URL unchanged, skipping update`);
+      return;
+    }
+
+    console.log(`Updating ${videoId} with new URL`);
+    hlsInstance.loadSource(newUrl);
   }
-
-  // Check if URL actually changed
-  const currentUrl = hlsInstance.url;
-  if (currentUrl === newUrl) {
-    console.log(`${videoId}: URL unchanged, skipping update`);
-    return;
-  }
-
-  console.log(`Updating ${videoId} with new URL`);
-
-  // Update source (HLS.js handles the transition)
-  hlsInstance.loadSource(newUrl);
 }
 
 // Initialize when DOM is ready
@@ -111,14 +230,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // URL patterns for different video sources
   const urlPatterns = {
-    'video-1': (token) => `https://hd-auth.skylinewebcams.com/live.m3u8?a=${token}&vid=1`,
     'video-3': (token) => `https://livecdn-de-earthtv-com.global.ssl.fastly.net/edge0/cdnedge/HpL-X8UABqM/playlist.m3u8?token=${token}&domain=www.earthtv.com`,
     'video-6': (token) => `https://hd-auth.skylinewebcams.com/live.m3u8?a=${token}&vid=6`
   };
 
   // Source webpage URLs where users can get new tokens
   const sourceUrls = {
-    'video-1': 'https://www.skylinewebcams.com/en/webcam/czech-republic/prague/prague/old-town.html',
     'video-3': 'https://www.earthtv.com/en/webcam/prague-charles-bridge',
     'video-6': 'https://www.skylinewebcams.com/en/webcam/czech-republic/prague/prague/prague.html'
   };
@@ -247,15 +364,53 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Exit fullscreen
         container.classList.remove('fullscreen');
         videoGrid.classList.remove('has-fullscreen');
+
+        // Mute the video and switch to low quality when exiting fullscreen
+        const video = container.querySelector('video');
+        if (video) {
+          video.muted = true;
+
+          // Switch to low quality URL for grid view
+          const videoId = video.id;
+          if (videoQualityUrls[videoId] && videoQualityUrls[videoId].lowQualityUrl) {
+            updateVideoSource(videoId, videoQualityUrls[videoId].lowQualityUrl);
+          }
+        }
+
         currentFullscreenContainer = null;
         console.log('Exited fullscreen');
       } else {
         // Enter fullscreen
         if (currentFullscreenContainer) {
           currentFullscreenContainer.classList.remove('fullscreen');
+
+          // Mute the previous fullscreen video and switch to low quality
+          const prevVideo = currentFullscreenContainer.querySelector('video');
+          if (prevVideo) {
+            prevVideo.muted = true;
+
+            const prevVideoId = prevVideo.id;
+            if (videoQualityUrls[prevVideoId] && videoQualityUrls[prevVideoId].lowQualityUrl) {
+              updateVideoSource(prevVideoId, videoQualityUrls[prevVideoId].lowQualityUrl);
+            }
+          }
         }
+
         container.classList.add('fullscreen');
         videoGrid.classList.add('has-fullscreen');
+
+        // Unmute the video and switch to high quality when entering fullscreen
+        const video = container.querySelector('video');
+        if (video) {
+          video.muted = false;
+
+          // Switch to high quality URL for fullscreen view
+          const videoId = video.id;
+          if (videoQualityUrls[videoId] && videoQualityUrls[videoId].highQualityUrl) {
+            updateVideoSource(videoId, videoQualityUrls[videoId].highQualityUrl);
+          }
+        }
+
         currentFullscreenContainer = container;
         console.log('Entered fullscreen');
       }
@@ -267,6 +422,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape' && currentFullscreenContainer) {
       currentFullscreenContainer.classList.remove('fullscreen');
       videoGrid.classList.remove('has-fullscreen');
+
+      // Mute the video and switch to low quality when exiting fullscreen
+      const video = currentFullscreenContainer.querySelector('video');
+      if (video) {
+        video.muted = true;
+
+        // Switch to low quality URL for grid view
+        const videoId = video.id;
+        if (videoQualityUrls[videoId] && videoQualityUrls[videoId].lowQualityUrl) {
+          updateVideoSource(videoId, videoQualityUrls[videoId].lowQualityUrl);
+        }
+      }
+
       currentFullscreenContainer = null;
       console.log('Exited fullscreen (ESC)');
     }
@@ -276,15 +444,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ===== END FULLSCREEN FEATURE =====
 
   // Set up URL refresh listener FIRST (before requesting initial URLs)
-  window.electronAPI.onUrlsRefreshed((results) => {
+  window.electronAPI.onUrlsRefreshed(async (results) => {
     console.log('Received URL refresh notification:', results.length, 'URLs');
-    results.forEach(({ videoId, url, success }) => {
-      if (success && url) {
-        updateVideoSource(videoId, url);
+    for (const { videoId, lowQualityUrl, highQualityUrl, url, isFeratel, success } of results) {
+      if (isFeratel) {
+        // Feratel stream (single URL via proxy)
+        if (success && url) {
+          console.log(`${videoId}: refreshed with Feratel proxy URL`);
+          updateVideoSource(videoId, url);
+        } else {
+          console.log(`${videoId}: Feratel refresh failed, keeping existing URL`);
+        }
+      } else if (success && lowQualityUrl) {
+        // YouTube stream (dual quality URLs)
+        videoQualityUrls[videoId] = {
+          lowQualityUrl,
+          highQualityUrl
+        };
+
+        // Update to low quality (we're in grid view by default)
+        updateVideoSource(videoId, lowQualityUrl);
+        console.log(`${videoId}: refreshed with dual quality URLs`);
       } else {
-        console.log(`${videoId}: refresh failed, keeping existing URL`);
+        console.log(`${videoId}: refresh failed, keeping existing URLs`);
       }
-    });
+    }
   });
 
   try {
@@ -294,22 +478,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Initialize all videos with received URLs
     console.log('Received URL map:', urlMap);
-    Object.entries(urlMap).forEach(([videoId, url]) => {
+    for (const [videoId, urlData] of Object.entries(urlMap)) {
       const videoElement = document.getElementById(videoId);
-      console.log(`Initializing ${videoId}:`, { element: !!videoElement, url });
 
-      if (videoElement && url) {
-        const hlsInstance = initializeHLSVideo(videoElement, url);
-        if (hlsInstance) {
-          hlsInstances[videoId] = hlsInstance;
-          console.log(`✓ ${videoId} initialized successfully`);
+      if (urlData.useMPV) {
+        // Feratel stream via proxy - use regular video element
+        if (urlData.url) {
+          console.log(`✓ ${videoId} using proxy URL`);
+          if (videoElement) {
+            updateVideoSource(videoId, urlData.url);
+          }
         } else {
-          console.log(`✗ ${videoId} HLS instance creation failed`);
+          console.log(`✗ ${videoId} skipped - no URL`);
+        }
+      } else if (urlData.isYoutube) {
+        // YouTube video with dual quality
+        if (videoElement && urlData.lowQualityUrl) {
+          // Store both URLs
+          videoQualityUrls[videoId] = {
+            lowQualityUrl: urlData.lowQualityUrl,
+            highQualityUrl: urlData.highQualityUrl
+          };
+
+          // Initialize with low quality for grid view
+          updateVideoSource(videoId, urlData.lowQualityUrl);
+          console.log(`✓ ${videoId} initialized with low quality`);
+        } else {
+          console.log(`✗ ${videoId} skipped - no low quality URL yet`);
         }
       } else {
-        console.log(`✗ ${videoId} skipped - element: ${!!videoElement}, url: ${!!url}`);
+        // Non-YouTube video (static URL)
+        if (videoElement && urlData.url) {
+          updateVideoSource(videoId, urlData.url);
+          console.log(`✓ ${videoId} initialized successfully`);
+        } else {
+          console.log(`✗ ${videoId} skipped - no URL`);
+        }
       }
-    });
+    }
 
     console.log('All video feeds initialized');
   } catch (error) {

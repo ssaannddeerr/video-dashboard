@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: blob:; connect-src 'self' https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.dashjs.org 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: http://127.0.0.1:* blob:; connect-src 'self' https: http://127.0.0.1:*;">
   <title>Video Dashboard</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
 </head>
 <body>
   <!-- Token Input Modal -->
@@ -28,10 +29,9 @@
   </div>
 
   <div class="video-grid">
-    <!-- Video 1: Prague HLS Stream -->
-    <div class="video-container" data-feed="prague">
+    <!-- Video 1: Feratel Stream -->
+    <div class="video-container" data-feed="feratel">
       <video id="video-1" autoplay muted playsinline loop></video>
-      <button class="token-update-btn" data-video="video-1" title="Update Token">🔑</button>
     </div>
 
     <!-- Video 3: EarthTV Stream (moved to position 2) -->
@@ -51,23 +51,19 @@
       <video id="video-4" autoplay muted playsinline loop></video>
     </div>
 
-    <!-- Position 5: Placeholder -->
-    <div class="video-container placeholder" data-feed="placeholder-5">
-      <div class="placeholder-content">
-        <span>Feed 5</span>
-      </div>
+    <!-- Video 5: YouTube Stream -->
+    <div class="video-container" data-feed="youtube-5">
+      <video id="video-5" autoplay muted playsinline loop></video>
     </div>
 
-    <div class="video-container placeholder" data-feed="placeholder-6">
-      <div class="placeholder-content">
-        <span>Feed 6</span>
-      </div>
+    <!-- Video 7: YouTube Stream -->
+    <div class="video-container" data-feed="youtube-7">
+      <video id="video-7" autoplay muted playsinline loop></video>
     </div>
 
-    <div class="video-container placeholder" data-feed="placeholder-7">
-      <div class="placeholder-content">
-        <span>Feed 7</span>
-      </div>
+    <!-- Video 8: DASH Stream -->
+    <div class="video-container" data-feed="idnes-vrsovice">
+      <video id="video-8" autoplay muted playsinline loop></video>
     </div>
 
     <!-- Video 2: YouTube Live Stream (moved to position 8) -->
