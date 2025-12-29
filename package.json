@@ -80,8 +80,7 @@
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "category": "Video",
-      "icon": "build/icon-1024.png"
+      "category": "Video"
     },
     "publish": null
   }
