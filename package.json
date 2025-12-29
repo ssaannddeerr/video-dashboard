@@ -37,7 +37,6 @@
         "filter": ["**/*"]
       }
     ],
-    "afterSign": "scripts/sign-mac.sh",
     "mac": {
       "category": "public.app-category.video",
       "target": [
@@ -70,8 +69,14 @@
       ]
     },
     "win": {
-      "target": ["nsis"],
-      "icon": "build/icon.ico"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "sign": null
     },
     "linux": {
       "target": ["AppImage", "deb"],
