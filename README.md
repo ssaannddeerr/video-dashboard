@@ -5,10 +5,24 @@ A beautiful Electron-based desktop application that displays live video feeds fr
 ![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+![Release](https://img.shields.io/github/v/release/ssaannddeerr/video-dashboard?include_prereleases&label=latest%20release)
 
 ## 📺 Overview
 
 Prague to San Francisco Live is a production-ready desktop application for monitoring multiple live video feeds from Prague, Czech Republic and San Francisco, California simultaneously. With optimized performance, hybrid dependency management, and platform-specific distribution, it provides a seamless experience for watching these two beautiful cities in real-time across all major operating systems.
+
+## 📥 Download
+
+**Latest Release: [v1.0.1](https://github.com/ssaannddeerr/video-dashboard/releases/latest)**
+
+| Platform | Download |
+|----------|----------|
+| 🪟 Windows x64 | [Setup.exe](https://github.com/ssaannddeerr/video-dashboard/releases/latest/download/Prague.to.San.Francisco.Live.Setup.1.0.0.exe) |
+| 🍎 macOS Universal | [.dmg](https://github.com/ssaannddeerr/video-dashboard/releases/latest/download/Prague.to.San.Francisco.Live-1.0.0-universal.dmg) |
+| 🐧 Linux x64 | [AppImage](https://github.com/ssaannddeerr/video-dashboard/releases/latest/download/Prague.to.San.Francisco.Live-1.0.0.AppImage) · [.deb](https://github.com/ssaannddeerr/video-dashboard/releases/latest/download/prague-to-san-francisco-live_1.0.0_amd64.deb) |
+| 🐧 Linux ARM64 | [AppImage](https://github.com/ssaannddeerr/video-dashboard/releases/latest/download/Prague.to.San.Francisco.Live-1.0.0-arm64.AppImage) |
+
+See [installation instructions](#-quick-start) below for setup requirements.
 
 ## ✨ Features
 
