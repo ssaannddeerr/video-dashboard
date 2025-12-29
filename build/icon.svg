@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Retro TV Icon with Color Bars -->
+  <g>
+    <!-- TV Body -->
+    <path fill="#726C7E" d="M482.4 128H29.6C13.3 128 0 141.3 0 157.6v268.8C0 442.7 13.3 456 29.6 456h85.3v30.4h-32c-8.8 0-16 7.2-16 16s7.2 16 16 16h345.8c8.8 0 16-7.2 16-16s-7.2-16-16-16h-32V456h85.3c16.3 0 29.6-13.3 29.6-29.6V157.6c.2-16.3-13.1-29.6-29.2-29.6z"/>
+
+    <!-- Screen -->
+    <rect fill="#5A5564" x="40" y="170" width="350" height="240" rx="8"/>
+
+    <!-- Color Bars -->
+    <rect fill="#FF5757" x="40" y="170" width="58" height="240"/>
+    <rect fill="#FFD700" x="98" y="170" width="58" height="240"/>
+    <rect fill="#FFED4E" x="156" y="170" width="58" height="240"/>
+    <rect fill="#5DADE2" x="214" y="170" width="58" height="240"/>
+    <rect fill="#82E0AA" x="272" y="170" width="58" height="240"/>
+    <rect fill="#F0F0F0" x="330" y="170" width="60" height="240"/>
+
+    <!-- Antenna -->
+    <path fill="#9BA8B8" d="M256 40l-40 88h20l20-44 20 44h20z"/>
+    <circle fill="#5A5564" cx="256" cy="128" r="20"/>
+
+    <!-- Control Panel -->
+    <g>
+      <!-- Lines -->
+      <rect fill="#8B8695" x="410" y="190" width="60" height="12" rx="6"/>
+      <rect fill="#8B8695" x="410" y="220" width="60" height="12" rx="6"/>
+      <rect fill="#8B8695" x="410" y="250" width="60" height="12" rx="6"/>
+
+      <!-- Knobs -->
+      <circle fill="#D4E6F1" cx="445" cy="300" r="25"/>
+      <circle fill="#AED6F1" cx="445" cy="300" r="20"/>
+
+      <circle fill="#D4E6F1" cx="445" cy="370" r="25"/>
+      <circle fill="#AED6F1" cx="445" cy="370" r="20"/>
+
+      <!-- Power Button -->
+      <rect fill="#E74C3C" x="430" y="425" width="30" height="15" rx="7.5"/>
+    </g>
+
+    <!-- Feet -->
+    <rect fill="#5A5564" x="40" y="470" width="45" height="25" rx="5"/>
+    <rect fill="#5A5564" x="427" y="470" width="45" height="25" rx="5"/>
+  </g>
+</svg>

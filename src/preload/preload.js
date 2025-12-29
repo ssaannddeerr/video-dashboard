@@ -19,6 +19,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('urls-refreshed');
   },
 
+  // Listen for Feratel video updates
+  onFeratelVideoReady: (callback) => {
+    ipcRenderer.on('feratel-video-ready', (event, data) => callback(data));
+  },
+
+  removeFeratelVideoListener: () => {
+    ipcRenderer.removeAllListeners('feratel-video-ready');
+  },
+
   // MPV controls
   startMPV: (videoId, streamUrl, geometry) => ipcRenderer.invoke('start-mpv', videoId, streamUrl, geometry),
   stopMPV: (videoId) => ipcRenderer.invoke('stop-mpv', videoId)

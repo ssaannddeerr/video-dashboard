@@ -7,8 +7,13 @@ logs/
 
 # Build output
 dist/
-build/
 out/
+
+# Build directory - but keep icons and docs
+build/*
+!build/icon.*
+!build/README-macOS.md
+!build/.gitkeep
 
 # OS files
 .DS_Store
@@ -26,3 +31,8 @@ Thumbs.db
 # Environment variables
 .env
 .env.local
+
+# Test files
+test-*.js
+test-*.sh
+test-output/

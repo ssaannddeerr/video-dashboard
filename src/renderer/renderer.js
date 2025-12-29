@@ -10,12 +10,18 @@ function initializeDASHVideo(videoElement, streamUrl) {
   if (typeof dashjs !== 'undefined') {
     const player = dashjs.MediaPlayer().create();
 
-    // Configure player settings
+    // Configure player settings with optimized buffers
     player.updateSettings({
       streaming: {
         lowLatencyEnabled: true,
         delay: {
           liveDelay: 3
+        },
+        buffer: {
+          bufferTimeAtTopQuality: 10,      // Reduce buffer
+          bufferTimeAtTopQualityLongForm: 20,
+          bufferToKeep: 10,                 // Keep less back-buffer
+          stableBufferTime: 6               // Start playback sooner
         }
       }
     });
@@ -51,6 +57,11 @@ function initializeHLSVideo(videoElement, streamUrl) {
       debug: false,
       enableWorker: true,
       lowLatencyMode: true,
+      // Optimized buffer settings for reduced memory usage
+      maxBufferLength: 10,        // Reduce from 30s to 10s
+      maxMaxBufferLength: 20,     // Max buffer cap
+      maxBufferSize: 10 * 1024 * 1024,  // 10MB max buffer
+      maxBufferHole: 0.5          // Smaller gap tolerance
     });
 
     hls.loadSource(streamUrl);
@@ -156,10 +167,11 @@ function updateVideoSource(videoId, newUrl) {
 
   // Detect stream type
   const isDash = newUrl.includes('.mpd');
-  const isMp4 = newUrl.includes('.mp4') || newUrl.includes('127.0.0.1');
+  const isMp4 = newUrl.includes('.mp4');
+  const isLocalFile = newUrl && (newUrl.startsWith('/') || newUrl.includes('video-cache'));
 
-  if (isMp4) {
-    // Handle native MP4 playback (for Feratel proxy)
+  if (isMp4 || isLocalFile) {
+    // Handle native MP4 playback (for local files and Feratel)
     console.log(`${videoId}: Using native MP4 playback`);
 
     // Clean up any existing HLS/DASH instances
@@ -172,8 +184,28 @@ function updateVideoSource(videoId, newUrl) {
       delete dashInstances[videoId];
     }
 
+    // For local files, use file:// protocol
+    const videoSrc = isLocalFile ? `file://${newUrl}` : newUrl;
+
+    // Remove any existing ended listeners to avoid duplicates
+    const oldEndedHandler = videoElement._loopHandler;
+    if (oldEndedHandler) {
+      videoElement.removeEventListener('ended', oldEndedHandler);
+    }
+
+    // Add manual loop handler for reliable looping (especially for local files)
+    const loopHandler = () => {
+      console.log(`${videoId}: Video ended, restarting loop...`);
+      videoElement.currentTime = 0;
+      videoElement.play().catch(err => {
+        console.error(`${videoId}: Failed to restart loop:`, err);
+      });
+    };
+    videoElement._loopHandler = loopHandler;
+    videoElement.addEventListener('ended', loopHandler);
+
     // Use native video element
-    videoElement.src = newUrl;
+    videoElement.src = videoSrc;
     videoElement.load();
     videoElement.play().catch(err => {
       console.error(`${videoId}: Autoplay prevented:`, err);
@@ -182,14 +214,15 @@ function updateVideoSource(videoId, newUrl) {
     // Handle DASH stream
     const dashInstance = dashInstances[videoId];
 
-    if (!dashInstance) {
-      console.log(`Creating initial DASH instance for ${videoId}`);
-      dashInstances[videoId] = initializeDASHVideo(videoElement, newUrl);
-      return;
+    // Always clean up old instance before creating new one
+    if (dashInstance) {
+      console.log(`Destroying old DASH instance for ${videoId}`);
+      dashInstance.destroy();
+      delete dashInstances[videoId];
     }
 
-    console.log(`Updating ${videoId} DASH stream with new URL`);
-    dashInstance.attachSource(newUrl);
+    console.log(`Creating new DASH instance for ${videoId}`);
+    dashInstances[videoId] = initializeDASHVideo(videoElement, newUrl);
   } else {
     // Handle HLS stream
     const hlsInstance = hlsInstances[videoId];
@@ -402,7 +435,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Unmute the video and switch to high quality when entering fullscreen
         const video = container.querySelector('video');
         if (video) {
-          video.muted = false;
+          // Keep video-5 muted even in fullscreen
+          if (video.id !== 'video-5') {
+            video.muted = false;
+          }
 
           // Switch to high quality URL for fullscreen view
           const videoId = video.id;
@@ -446,16 +482,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set up URL refresh listener FIRST (before requesting initial URLs)
   window.electronAPI.onUrlsRefreshed(async (results) => {
     console.log('Received URL refresh notification:', results.length, 'URLs');
-    for (const { videoId, lowQualityUrl, highQualityUrl, url, isFeratel, success } of results) {
-      if (isFeratel) {
-        // Feratel stream (single URL via proxy)
-        if (success && url) {
-          console.log(`${videoId}: refreshed with Feratel proxy URL`);
-          updateVideoSource(videoId, url);
-        } else {
-          console.log(`${videoId}: Feratel refresh failed, keeping existing URL`);
-        }
-      } else if (success && lowQualityUrl) {
+    for (const { videoId, lowQualityUrl, highQualityUrl, success } of results) {
+      if (success && lowQualityUrl) {
         // YouTube stream (dual quality URLs)
         videoQualityUrls[videoId] = {
           lowQualityUrl,
@@ -468,6 +496,37 @@ document.addEventListener('DOMContentLoaded', async () => {
       } else {
         console.log(`${videoId}: refresh failed, keeping existing URLs`);
       }
+    }
+  });
+
+  // Set up Feratel video update listener
+  window.electronAPI.onFeratelVideoReady((data) => {
+    console.log('Feratel video ready:', data);
+    const { videoId, path, timestamp } = data;
+
+    const videoElement = document.getElementById(videoId);
+    if (!videoElement) {
+      console.warn(`Video element ${videoId} not found`);
+      return;
+    }
+
+    console.log(`${videoId}: Updating to new video with timestamp ${timestamp}`);
+
+    // Add timestamp to force browser to reload (bypasses cache)
+    // Since we overwrite feratel-current.mp4, the path stays the same but content changes
+    const pathWithTimestamp = `${path}?t=${timestamp}`;
+
+    // Save current playback state
+    const wasPlaying = !videoElement.paused;
+
+    // Switch to new video immediately
+    updateVideoSource(videoId, pathWithTimestamp);
+
+    // Resume playback if it was playing before
+    if (wasPlaying) {
+      videoElement.play().catch(err => {
+        console.error(`${videoId}: Failed to resume playback:`, err);
+      });
     }
   });
 
@@ -531,6 +590,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       videos.forEach(v => {
         v.play().catch(err => console.log('Resume play prevented:', err));
       });
+    }
+  });
+
+  // Enhanced visibility handling - pause when window loses focus (minimized/background)
+  let windowVisible = true;
+
+  window.addEventListener('blur', () => {
+    windowVisible = false;
+    const videos = document.querySelectorAll('video');
+    videos.forEach(v => v.pause());
+    console.log('Window lost focus - videos paused');
+  });
+
+  window.addEventListener('focus', () => {
+    windowVisible = true;
+    if (!document.hidden) {
+      // Reload page to get fresh live streams (avoids out-of-date video after pause)
+      console.log('Window gained focus - reloading page for fresh streams');
+      window.location.reload();
     }
   });
 

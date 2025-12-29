@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.dashjs.org 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: http://127.0.0.1:* blob:; connect-src 'self' https: http://127.0.0.1:*;">
-  <title>Video Dashboard</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.dashjs.org https://weatherwidget.io 'unsafe-inline'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https: http://127.0.0.1:* blob: file:; connect-src 'self' https: http://127.0.0.1:*; frame-src https://weatherwidget.io https://forecast7.com;">
+  <title>Prague to San Francisco Live</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
@@ -31,7 +31,10 @@
   <div class="video-grid">
     <!-- Video 1: Feratel Stream -->
     <div class="video-container" data-feed="feratel">
-      <video id="video-1" autoplay muted playsinline loop></video>
+      <video id="video-1" autoplay muted playsinline></video>
+      <div id="weather-widget-container" class="weather-widget-container">
+        <a class="weatherwidget-io" href="https://forecast7.com/en/50d0814d44/prague/" data-label_1="PRAGUE" data-label_2="WEATHER" data-icons="Climacons Animated" data-days="3" data-theme="original">PRAGUE WEATHER</a>
+      </div>
     </div>
 
     <!-- Video 3: EarthTV Stream (moved to position 2) -->
@@ -93,5 +96,8 @@
   </div>
 
   <script src="renderer.js"></script>
+  <script>
+    !function(d,s,id){var js,fjs=d.getElementsByTagName(s)[0];if(!d.getElementById(id)){js=d.createElement(s);js.id=id;js.src='https://weatherwidget.io/js/widget.min.js';fjs.parentNode.insertBefore(js,fjs);}}(document,'script','weatherwidget-io-js');
+  </script>
 </body>
 </html>

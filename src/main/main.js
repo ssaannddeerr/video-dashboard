@@ -1,8 +1,141 @@
-const { app, BrowserWindow, ipcMain, protocol } = require('electron');
+const { app, BrowserWindow, ipcMain, protocol, dialog, shell, clipboard } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const https = require('https');
 const http = require('http');
+const fs = require('fs');
+
+// ============================================================================
+// DEPENDENCY PATH RESOLUTION & VALIDATION
+// ============================================================================
+
+/**
+ * Get the correct path to an external executable
+ * @param {string} name - Executable name (e.g., 'yt-dlp', 'ffmpeg')
+ * @returns {string} - Full path to executable or bare name for PATH lookup
+ */
+function getExecutablePath(name) {
+  // Windows packaged mode: use bundled executables
+  if (app.isPackaged && process.platform === 'win32') {
+    const exePath = path.join(process.resourcesPath, 'bin', `${name}.exe`);
+    console.log(`Windows packaged mode: ${name} -> ${exePath}`);
+    return exePath;
+  }
+
+  // All other cases: use system PATH (Mac, Linux, dev mode)
+  const systemName = process.platform === 'win32' ? `${name}.exe` : name;
+  console.log(`Using system PATH: ${systemName}`);
+  return systemName;
+}
+
+/**
+ * Check if an executable exists and is accessible
+ * @param {string} execPath - Path to check
+ * @returns {boolean} - True if executable exists and is accessible
+ */
+function checkExecutable(execPath) {
+  // If bare name (no path separators), assume it's in PATH
+  if (!execPath.includes(path.sep) && !execPath.includes('/')) {
+    return true; // Will be validated at runtime
+  }
+
+  // For full paths, check file existence
+  try {
+    return fs.existsSync(execPath);
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Show platform-specific error dialog for missing dependencies
+ * @param {string[]} missing - Array of missing dependency names
+ * @returns {Promise<boolean>} - False (always quit)
+ */
+async function showDependencyErrorDialog(missing) {
+  if (process.platform === 'darwin') {
+    // macOS: Homebrew installation instructions
+    const brewCommand = `brew install ${missing.join(' ')}`;
+
+    const result = await dialog.showMessageBox({
+      type: 'error',
+      title: 'Missing Dependencies',
+      message: 'Required tools not found',
+      detail: `Video Dashboard requires:\n\n${missing.map(m => `  • ${m}`).join('\n')}\n\n` +
+              `Install via Terminal:\n\n  ${brewCommand}\n\n` +
+              `(Need Homebrew? Visit https://brew.sh)\n\n` +
+              `The app will quit now.`,
+      buttons: ['Copy Command', 'Open brew.sh', 'Quit'],
+      defaultId: 2,
+      cancelId: 2
+    });
+
+    if (result.response === 0) {
+      clipboard.writeText(brewCommand);
+      console.log('Copied install command to clipboard');
+    } else if (result.response === 1) {
+      shell.openExternal('https://brew.sh');
+    }
+
+    return false;
+  } else if (process.platform === 'win32') {
+    // Windows: Reinstall instructions
+    await dialog.showMessageBox({
+      type: 'error',
+      title: 'Missing Dependencies',
+      message: 'Required tools not found',
+      detail: `Video Dashboard requires:\n\n${missing.map(m => `  • ${m}.exe`).join('\n')}\n\n` +
+              `These should be bundled with the app.\n` +
+              `Please try:\n` +
+              `  1. Reinstall Video Dashboard\n` +
+              `  2. Check if antivirus blocked files\n\n` +
+              `The app will quit now.`,
+      buttons: ['Quit'],
+      defaultId: 0
+    });
+
+    return false;
+  }
+
+  // Linux: Generic message
+  await dialog.showMessageBox({
+    type: 'error',
+    title: 'Missing Dependencies',
+    message: 'Required tools not found',
+    detail: `Required tools not found: ${missing.join(', ')}\n\nPlease install them and restart.`,
+    buttons: ['Quit'],
+    defaultId: 0
+  });
+
+  return false;
+}
+
+/**
+ * Check all required dependencies on startup
+ * @returns {Promise<boolean>} - True if all dependencies found, false otherwise
+ */
+async function checkDependencies() {
+  console.log('=== Checking Dependencies ===');
+  console.log(`Platform: ${process.platform}, Packaged: ${app.isPackaged}`);
+
+  const required = ['yt-dlp', 'ffmpeg'];
+  const missing = [];
+
+  for (const dep of required) {
+    const execPath = getExecutablePath(dep);
+    const exists = checkExecutable(execPath);
+    console.log(`  ${dep}: ${exists ? '✓' : '✗'} (${execPath})`);
+    if (!exists) missing.push(dep);
+  }
+
+  if (missing.length > 0) {
+    console.error(`Missing dependencies: ${missing.join(', ')}`);
+    return await showDependencyErrorDialog(missing);
+  }
+
+  console.log('✓ All dependencies found');
+  return true;
+}
 
 // Fetch Feratel cookies (both JSESSIONID and dcs)
 async function fetchFeratelCookies() {
@@ -68,7 +201,7 @@ async function fetchFeratelCookies() {
 // Fetch Feratel stream URL
 async function fetchFeratelStreamUrl(pageUrl) {
   return new Promise((resolve, reject) => {
-    const ytdlp = spawn('yt-dlp', ['-g', pageUrl]);
+    const ytdlp = spawn(getExecutablePath('yt-dlp'), ['-g', pageUrl]);
     let stdout = '';
 
     ytdlp.stdout.on('data', (data) => {
@@ -88,6 +221,261 @@ async function fetchFeratelStreamUrl(pageUrl) {
       reject(new Error('Stream URL fetch timeout'));
     }, 30000);
   });
+}
+
+// Fetch current weather data for Prague
+async function fetchWeatherData() {
+  return new Promise((resolve, reject) => {
+    // OpenWeatherMap free API - Prague coordinates
+    // NOTE: Replace 'YOUR_API_KEY' with actual API key from openweathermap.org
+    const API_KEY = process.env.OPENWEATHER_API_KEY || 'YOUR_API_KEY';
+    const options = {
+      hostname: 'api.openweathermap.org',
+      path: `/data/2.5/weather?lat=50.0755&lon=14.4378&units=metric&appid=${API_KEY}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Video-Dashboard/1.0'
+      }
+    };
+
+    console.log('Fetching weather data for Prague...');
+
+    const req = https.request(options, (res) => {
+      let data = '';
+
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      res.on('end', () => {
+        try {
+          if (res.statusCode === 200) {
+            const weather = JSON.parse(data);
+            const weatherData = {
+              temperature: Math.round(weather.main.temp),
+              feelsLike: Math.round(weather.main.feels_like),
+              condition: weather.weather[0].main,
+              description: weather.weather[0].description,
+              icon: weather.weather[0].icon,
+              humidity: weather.main.humidity,
+              windSpeed: Math.round(weather.wind.speed * 3.6), // Convert m/s to km/h
+              timestamp: Date.now()
+            };
+            console.log('✓ Weather data fetched:', weatherData);
+            resolve(weatherData);
+          } else {
+            console.warn(`Weather API returned status ${res.statusCode}`);
+            // Return fallback data
+            resolve({
+              temperature: null,
+              condition: 'Unknown',
+              description: 'Weather data unavailable',
+              timestamp: Date.now()
+            });
+          }
+        } catch (error) {
+          console.error('Failed to parse weather data:', error.message);
+          resolve({
+            temperature: null,
+            condition: 'Unknown',
+            description: 'Weather data unavailable',
+            timestamp: Date.now()
+          });
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      console.error('Weather fetch error:', err.message);
+      // Return fallback data instead of rejecting
+      resolve({
+        temperature: null,
+        condition: 'Unknown',
+        description: 'Weather data unavailable',
+        timestamp: Date.now()
+      });
+    });
+
+    req.end();
+
+    setTimeout(() => {
+      req.destroy();
+      resolve({
+        temperature: null,
+        condition: 'Unknown',
+        description: 'Weather data unavailable',
+        timestamp: Date.now()
+      });
+    }, 10000);
+  });
+}
+
+// Get video cache directory path (creates if doesn't exist)
+function getVideoCacheDir() {
+  const userDataPath = app.getPath('userData');
+  const cacheDir = path.join(userDataPath, 'video-cache');
+
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+
+  return cacheDir;
+}
+
+// Remove audio from video using ffmpeg
+async function removeAudioFromVideo(inputPath, outputPath) {
+  return new Promise((resolve, reject) => {
+    console.log('Removing audio with ffmpeg...');
+
+    const ffmpeg = spawn(getExecutablePath('ffmpeg'), [
+      '-i', inputPath,
+      '-c:v', 'copy',      // Copy video stream without re-encoding
+      '-an',                // Remove all audio streams
+      '-y',                 // Overwrite output file
+      outputPath
+    ]);
+
+    let stderr = '';
+
+    ffmpeg.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0) {
+        // Verify output file
+        const stats = fs.statSync(outputPath);
+        if (stats.size < 1024 * 1024) {
+          reject(new Error(`Processed file too small: ${stats.size} bytes`));
+          return;
+        }
+
+        console.log(`✓ Audio removed: ${stats.size} bytes`);
+        resolve(outputPath);
+      } else {
+        reject(new Error(`ffmpeg failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    ffmpeg.on('error', (err) => {
+      reject(new Error(`Failed to start ffmpeg: ${err.message}`));
+    });
+
+    // Timeout after 2 minutes
+    setTimeout(() => {
+      ffmpeg.kill();
+      reject(new Error('Audio removal timeout'));
+    }, 120000);
+  });
+}
+
+// Download Feratel video to local file using yt-dlp
+async function downloadFeratelVideo(streamUrl, cookies) {
+  const cacheDir = getVideoCacheDir();
+  const tempPath = path.join(cacheDir, 'feratel-temp.mp4');
+  const tempNoAudioPath = path.join(cacheDir, 'feratel-temp-no-audio.mp4');
+  const finalPath = path.join(cacheDir, 'feratel-current.mp4');
+
+  // Build cookie string
+  let cookieString = `JSESSIONID=${cookies.JSESSIONID}`;
+  if (cookies.dcs) cookieString += `; dcs=${cookies.dcs}`;
+
+  return new Promise((resolve, reject) => {
+    const ytdlp = spawn(getExecutablePath('yt-dlp'), [
+      streamUrl,
+      '-o', tempPath,
+      '--add-header', `Cookie:${cookieString}`,
+      '--add-header', 'Referer:https://webtvfc.feratel.com/',
+      '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0',
+      '--no-part',
+      '--force-overwrites'
+    ]);
+
+    let stderr = '';
+
+    ytdlp.stderr.on('data', (data) => {
+      stderr += data.toString();
+      console.log('yt-dlp:', data.toString().trim());
+    });
+
+    ytdlp.on('close', async (code) => {
+      if (code === 0) {
+        // Verify file size (> 1MB for valid video)
+        const stats = fs.statSync(tempPath);
+        if (stats.size < 1024 * 1024) {
+          reject(new Error(`Downloaded file too small: ${stats.size} bytes`));
+          return;
+        }
+
+        console.log(`✓ Feratel video downloaded: ${stats.size} bytes`);
+
+        try {
+          // Remove audio from downloaded video
+          await removeAudioFromVideo(tempPath, tempNoAudioPath);
+
+          // Clean up original temp file with audio
+          fs.unlinkSync(tempPath);
+
+          // Atomic rename to final path
+          fs.renameSync(tempNoAudioPath, finalPath);
+
+          const finalStats = fs.statSync(finalPath);
+          console.log(`✓ Final video ready: ${finalStats.size} bytes (no audio)`);
+          resolve(finalPath);
+        } catch (error) {
+          // Clean up temp files on error
+          if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+          if (fs.existsSync(tempNoAudioPath)) fs.unlinkSync(tempNoAudioPath);
+          reject(error);
+        }
+      } else {
+        reject(new Error(`yt-dlp failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    setTimeout(() => {
+      ytdlp.kill();
+      reject(new Error('Download timeout'));
+    }, 300000); // 5 minute timeout
+  });
+}
+
+// Check if video file exists and is valid
+function getFeratelVideoPath() {
+  const cacheDir = getVideoCacheDir();
+  const videoPath = path.join(cacheDir, 'feratel-current.mp4');
+
+  if (!fs.existsSync(videoPath)) return null;
+
+  // Verify file is valid (> 1MB)
+  const stats = fs.statSync(videoPath);
+  if (stats.size < 1024 * 1024) {
+    console.warn('Feratel video file too small, treating as invalid');
+    return null;
+  }
+
+  return videoPath;
+}
+
+// Cleanup old temp files on startup
+function cleanupFeratelCache() {
+  const cacheDir = getVideoCacheDir();
+  const tempPath = path.join(cacheDir, 'feratel-temp.mp4');
+  const tempNoAudioPath = path.join(cacheDir, 'feratel-temp-no-audio.mp4');
+
+  let cleaned = 0;
+  if (fs.existsSync(tempPath)) {
+    fs.unlinkSync(tempPath);
+    cleaned++;
+  }
+  if (fs.existsSync(tempNoAudioPath)) {
+    fs.unlinkSync(tempNoAudioPath);
+    cleaned++;
+  }
+
+  if (cleaned > 0) {
+    console.log(`Cleaned up ${cleaned} old temp file(s)`);
+  }
 }
 
 // Video configuration mapping video IDs to their source URLs
@@ -151,7 +539,8 @@ const VIDEO_CONFIG = {
   // Non-YouTube feeds (remain unchanged)
   'video-1': {
     feratelUrl: 'https://webtvfc.feratel.com/webtv/?design=v5&pg=DA7D2F22-8600-464D-9D4F-CDB04014A6C5&cam=2127&lg=en&autoplay=1&sound=muted&muted=1&mute=1&playsinline=1&c45=1',
-    staticUrl: null,
+    localVideoPath: null,  // Path to downloaded video file
+    lastDownload: null,    // Timestamp of last download
     lastRefresh: null,
     isFeratel: true,
     isYoutube: false
@@ -180,7 +569,7 @@ async function fetchYouTubeUrl(youtubeUrl, quality = 'high') {
       high: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
     };
 
-    const ytdlp = spawn('yt-dlp', [
+    const ytdlp = spawn(getExecutablePath('yt-dlp'), [
       '-f', formats[quality],
       '-g',
       youtubeUrl
@@ -313,77 +702,38 @@ async function fetchEarthCamUrl(pageUrl) {
   });
 }
 
-// Refresh all dynamic URLs (YouTube and Feratel) in parallel
+// Refresh all dynamic URLs (YouTube only) in parallel
 async function refreshAllYouTubeUrls(mainWindow) {
   const refreshPromises = Object.entries(VIDEO_CONFIG)
-    .filter(([id, config]) => config.isYoutube || config.isFeratel)
+    .filter(([id, config]) => config.isYoutube)
     .map(async ([videoId, config]) => {
-      if (config.isFeratel) {
-        // Handle Feratel stream - fetch cookies and stream URL, serve via proxy
-        try {
-          console.log(`Refreshing ${videoId} (Feratel)...`);
+      // Handle YouTube stream
+      try {
+        console.log(`Refreshing ${videoId}...`);
 
-          // Fetch cookies and stream URL
-          feratelCookies = await fetchFeratelCookies();
-          feratelStreamUrl = await fetchFeratelStreamUrl(config.feratelUrl);
+        const { lowQualityUrl, highQualityUrl } = await fetchBothQualities(config.youtubeUrl);
 
-          console.log(`Feratel stream URL: ${feratelStreamUrl}`);
-          console.log(`Feratel cookies:`, feratelCookies);
+        VIDEO_CONFIG[videoId].lowQualityUrl = lowQualityUrl;
+        VIDEO_CONFIG[videoId].highQualityUrl = highQualityUrl;
+        VIDEO_CONFIG[videoId].lastRefresh = Date.now();
 
-          // Create proxy if not exists
-          createFeratelProxy();
-
-          // Use local proxy URL
-          const proxyUrl = 'http://127.0.0.1:9877/stream.mp4';
-          VIDEO_CONFIG[videoId].staticUrl = proxyUrl;
-          VIDEO_CONFIG[videoId].lastRefresh = Date.now();
-
-          console.log(`✓ ${videoId} (Feratel) refreshed successfully`);
-          return {
-            videoId,
-            url: proxyUrl,
-            isFeratel: true,
-            success: true
-          };
-        } catch (error) {
-          console.error(`✗ Failed to refresh ${videoId} (Feratel):`, error.message);
-          return {
-            videoId,
-            url: VIDEO_CONFIG[videoId].staticUrl,
-            isFeratel: true,
-            success: false,
-            error: error.message
-          };
-        }
-      } else {
-        // Handle YouTube stream
-        try {
-          console.log(`Refreshing ${videoId}...`);
-
-          const { lowQualityUrl, highQualityUrl } = await fetchBothQualities(config.youtubeUrl);
-
-          VIDEO_CONFIG[videoId].lowQualityUrl = lowQualityUrl;
-          VIDEO_CONFIG[videoId].highQualityUrl = highQualityUrl;
-          VIDEO_CONFIG[videoId].lastRefresh = Date.now();
-
-          console.log(`✓ ${videoId} refreshed successfully (low + high quality)`);
-          return {
-            videoId,
-            lowQualityUrl,
-            highQualityUrl,
-            success: true
-          };
-        } catch (error) {
-          console.error(`✗ Failed to refresh ${videoId}:`, error.message);
-          // Keep existing URLs if available
-          return {
-            videoId,
-            lowQualityUrl: VIDEO_CONFIG[videoId].lowQualityUrl,
-            highQualityUrl: VIDEO_CONFIG[videoId].highQualityUrl,
-            success: false,
-            error: error.message
-          };
-        }
+        console.log(`✓ ${videoId} refreshed successfully (low + high quality)`);
+        return {
+          videoId,
+          lowQualityUrl,
+          highQualityUrl,
+          success: true
+        };
+      } catch (error) {
+        console.error(`✗ Failed to refresh ${videoId}:`, error.message);
+        // Keep existing URLs if available
+        return {
+          videoId,
+          lowQualityUrl: VIDEO_CONFIG[videoId].lowQualityUrl,
+          highQualityUrl: VIDEO_CONFIG[videoId].highQualityUrl,
+          success: false,
+          error: error.message
+        };
       }
     });
 
@@ -400,79 +750,54 @@ async function refreshAllYouTubeUrls(mainWindow) {
   return results;
 }
 
+// Refresh Feratel video - download to local file
+async function refreshFeratelVideo(mainWindow) {
+  const videoId = 'video-1';
+  const config = VIDEO_CONFIG[videoId];
+
+  try {
+    console.log(`[${new Date().toISOString()}] Starting Feratel video download...`);
+
+    // Fetch cookies and stream URL
+    feratelCookies = await fetchFeratelCookies();
+    feratelStreamUrl = await fetchFeratelStreamUrl(config.feratelUrl);
+
+    console.log(`Feratel stream URL: ${feratelStreamUrl}`);
+
+    // Fetch weather data in parallel with video download
+    const [videoPath, weatherData] = await Promise.all([
+      downloadFeratelVideo(feratelStreamUrl, feratelCookies),
+      fetchWeatherData()
+    ]);
+
+    // Update config
+    config.localVideoPath = videoPath;
+    config.lastDownload = Date.now();
+    config.weatherData = weatherData; // Store weather data in config
+
+    // Notify renderer to update video source and weather
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('feratel-video-ready', {
+        videoId,
+        path: videoPath,
+        timestamp: config.lastDownload,
+        weather: weatherData
+      });
+    }
+
+    console.log(`✓ Feratel video refresh complete`);
+    return { success: true, path: videoPath, weather: weatherData };
+  } catch (error) {
+    console.error(`✗ Feratel video refresh failed:`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 let mainWindow = null;
 let refreshTimer = null;
 let mpvProcesses = {}; // Store MPV subprocess instances
-let feratelProxy = null;
 let feratelCookies = {}; // Store both JSESSIONID and dcs
 let feratelStreamUrl = null;
-
-// Create a simple HTTP proxy for Feratel stream
-function createFeratelProxy() {
-  if (feratelProxy) return;
-
-  feratelProxy = http.createServer(async (req, res) => {
-    if (!feratelStreamUrl || !feratelCookies.JSESSIONID) {
-      res.writeHead(503, { 'Content-Type': 'text/plain' });
-      res.end('Stream not ready');
-      return;
-    }
-
-    console.log('Proxying Feratel stream request');
-
-    const streamUrl = new URL(feratelStreamUrl);
-
-    // Build cookie string with both cookies
-    let cookieString = `JSESSIONID=${feratelCookies.JSESSIONID}`;
-    if (feratelCookies.dcs) {
-      cookieString += `; dcs=${feratelCookies.dcs}`;
-    }
-
-    const options = {
-      hostname: streamUrl.hostname,
-      path: streamUrl.pathname + streamUrl.search,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:146.0) Gecko/20100101 Firefox/146.0',
-        'Accept': 'video/webm,video/ogg,video/*;q=0.9,application/ogg;q=0.7,audio/*;q=0.6,*/*;q=0.5',
-        'Referer': 'https://webtvfc.feratel.com/',
-        'Cookie': cookieString,
-        'Range': req.headers.range || 'bytes=0-',
-        'Connection': 'keep-alive'
-      }
-    };
-
-    console.log('Proxying with cookie:', cookieString);
-
-    https.get(options, (streamRes) => {
-      console.log('Stream response status:', streamRes.statusCode);
-
-      const headers = {
-        'Content-Type': streamRes.headers['content-type'] || 'video/mp4',
-        'Accept-Ranges': 'bytes',
-        'Access-Control-Allow-Origin': '*'
-      };
-
-      if (streamRes.headers['content-length']) {
-        headers['Content-Length'] = streamRes.headers['content-length'];
-      }
-      if (streamRes.headers['content-range']) {
-        headers['Content-Range'] = streamRes.headers['content-range'];
-      }
-
-      res.writeHead(streamRes.statusCode, headers);
-      streamRes.pipe(res);
-    }).on('error', (err) => {
-      console.error('Proxy error:', err);
-      res.writeHead(500);
-      res.end('Proxy error');
-    });
-  });
-
-  feratelProxy.listen(9877, '127.0.0.1', () => {
-    console.log('Feratel proxy listening on http://127.0.0.1:9877');
-  });
-}
 
 // Start MPV for a specific video
 function startMPV(videoId, streamUrl, windowId) {
@@ -569,11 +894,19 @@ ipcMain.handle('get-initial-urls', async () => {
         isYoutube: true,
         useMPV: false
       };
+    } else if (config.isFeratel) {
+      // Return local file path instead of proxy URL
+      urlMap[id] = {
+        url: config.localVideoPath,
+        isYoutube: false,
+        isFeratel: true,
+        useMPV: false
+      };
     } else {
       urlMap[id] = {
         url: config.staticUrl,
         isYoutube: false,
-        useMPV: config.isFeratel || false
+        useMPV: false
       };
     }
   });
@@ -667,29 +1000,63 @@ ipcMain.handle('stop-mpv', async (event, videoId) => {
 });
 
 app.whenReady().then(async () => {
+  // Check dependencies FIRST before doing anything
+  const depsOk = await checkDependencies();
+  if (!depsOk) {
+    app.quit();
+    return;
+  }
+
+  // Cleanup old temp files
+  cleanupFeratelCache();
+
   // Create window first
   createWindow();
 
-  // Wait for renderer to be ready, then perform initial URL refresh
+  // Wait for renderer to be ready
   mainWindow.webContents.once('did-finish-load', async () => {
-    console.log('Renderer loaded, performing initial YouTube URL refresh...');
-    await refreshAllYouTubeUrls(mainWindow);
+    console.log('Renderer loaded, starting initial refresh...');
+
+    // Check if Feratel video already exists
+    const existingVideo = getFeratelVideoPath();
+    if (existingVideo) {
+      console.log('Existing Feratel video found:', existingVideo);
+      VIDEO_CONFIG['video-1'].localVideoPath = existingVideo;
+    }
+
+    // Start parallel refresh for YouTube and Feratel
+    await Promise.all([
+      refreshAllYouTubeUrls(mainWindow),
+      refreshFeratelVideo(mainWindow)
+    ]);
   });
 
-  // Start periodic refresh timer (5 hours for YouTube)
-  const REFRESH_INTERVAL = 5 * 60 * 60 * 1000; // 5 hours in milliseconds
-  refreshTimer = setInterval(async () => {
+  // Periodic refresh timer for YouTube (5 hours)
+  const YOUTUBE_REFRESH_INTERVAL = 5 * 60 * 60 * 1000;
+  setInterval(async () => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] Periodic YouTube refresh triggered`);
-
     try {
       await refreshAllYouTubeUrls(mainWindow);
     } catch (error) {
       console.error('Periodic YouTube refresh failed:', error);
     }
-  }, REFRESH_INTERVAL);
+  }, YOUTUBE_REFRESH_INTERVAL);
 
-  console.log(`Periodic YouTube refresh scheduled every ${REFRESH_INTERVAL / 1000 / 60 / 60} hours`);
+  // Periodic refresh timer for Feratel (10 minutes)
+  const FERATEL_REFRESH_INTERVAL = 10 * 60 * 1000;
+  setInterval(async () => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] Periodic Feratel refresh triggered`);
+    try {
+      await refreshFeratelVideo(mainWindow);
+    } catch (error) {
+      console.error('Periodic Feratel refresh failed:', error);
+    }
+  }, FERATEL_REFRESH_INTERVAL);
+
+  console.log(`YouTube refresh: every ${YOUTUBE_REFRESH_INTERVAL / 1000 / 60 / 60} hours`);
+  console.log(`Feratel refresh: every ${FERATEL_REFRESH_INTERVAL / 1000 / 60} minutes`);
 
   app.on('activate', () => {
     // On macOS, re-create window when dock icon is clicked and no windows are open

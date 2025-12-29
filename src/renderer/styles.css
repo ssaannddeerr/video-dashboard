@@ -352,3 +352,35 @@ video::-webkit-media-controls-panel {
 .token-update-btn:active {
   transform: scale(0.95);
 }
+
+/* Weather Widget Container */
+.weather-widget-container {
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 50%;
+  max-width: 600px;
+  display: none; /* Hidden in grid view */
+  z-index: 1000;
+  pointer-events: auto;
+  opacity: 0.95;
+  transition: opacity 0.3s ease;
+}
+
+.weather-widget-container:hover {
+  opacity: 1;
+}
+
+/* Only show weather widget in fullscreen mode */
+.video-container.fullscreen .weather-widget-container {
+  display: block;
+}
+
+/* Style the weather widget iframe when it loads */
+.weather-widget-container .weatherwidget-io {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}

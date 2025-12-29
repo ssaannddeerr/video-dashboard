@@ -1,7 +1,7 @@
 {
-  "name": "video-dashboard",
+  "name": "prague-to-san-francisco-live",
   "version": "1.0.0",
-  "description": "Electron video dashboard with 12 video feeds in 3x4 grid",
+  "description": "Live video feeds from Prague and San Francisco in a 3x4 grid",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
@@ -11,7 +11,7 @@
     "build:linux": "electron-builder --linux"
   },
   "keywords": ["electron", "video", "dashboard", "streaming"],
-  "author": "",
+  "author": "sander <sander@lewis.su>",
   "license": "MIT",
   "dependencies": {
     "hls.js": "^1.5.0"
@@ -21,8 +21,8 @@
     "electron-builder": "^24.9.0"
   },
   "build": {
-    "productName": "Video Dashboard",
-    "appId": "com.videodashboard.app",
+    "productName": "Prague to San Francisco Live",
+    "appId": "com.praguetosanfranciscolive.app",
     "directories": {
       "output": "dist"
     },
@@ -30,6 +30,14 @@
       "src/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "resources/bin",
+        "to": "bin",
+        "filter": ["**/*"]
+      }
+    ],
+    "afterSign": "scripts/sign-mac.sh",
     "mac": {
       "category": "public.app-category.video",
       "target": [
@@ -41,7 +49,7 @@
       "icon": "build/icon.icns"
     },
     "dmg": {
-      "title": "Video Dashboard Installer",
+      "title": "Prague to San Francisco Live Installer",
       "contents": [
         {
           "x": 130,
@@ -52,6 +60,12 @@
           "y": 220,
           "type": "link",
           "path": "/Applications"
+        },
+        {
+          "x": 270,
+          "y": 400,
+          "type": "file",
+          "path": "build/README-macOS.md"
         }
       ]
     },
